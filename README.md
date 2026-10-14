@@ -206,7 +206,7 @@ Per-level thinking budget for the registered vLLM model (injected as `thinking_t
 
 ```bash
 curl -s http://127.0.0.1:8081/v1/models | jq -r '.data[0] | "\(.id) owned_by=\(.owned_by)"'
-# halogen-qwen3.8-flash-next owned_by=halogen
+# halogen-example-model owned_by=halogen
 
 curl -s http://127.0.0.1:8081/health | jq '{context, slot_ctx, slots}'
 # { "context": 262144, "slot_ctx": 262144, "slots": 3 }
@@ -240,7 +240,7 @@ The same format is applied to the whole llama.cpp family (their Qwen templates r
 **Manual overrides** — halogen reports `drafters_available` and `drafter_default` in `/health`, but llama-infra does not read the drafter yet. Set it per model:
 
 ```json
-{ "modelOptions": { "halogen-qwen3.8-flash-next": { "drafter": "mtp" } } }
+{ "modelOptions": { "halogen-example-model": { "drafter": "mtp" } } }
 ```
 
 **Known limitations**

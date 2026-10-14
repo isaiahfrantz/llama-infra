@@ -73,15 +73,15 @@ console.log("halogen: applyHalogenHealth sticky context");
 shared.halogenCtx.clear();
 healthMode = "ok";
 healthBody = { slot_ctx: 262144, vision: { enabled: true } };
-const halogenModels: LlamaCppModel[] = [{ id: "halogen-qwen3.8-flash-next", object: "model", owned_by: "halogen" }];
-const grafted = await applyHalogenHealth(baseUrl, halogenModels, 2000, undefined, "bruma:8081");
+const halogenModels: LlamaCppModel[] = [{ id: "halogen-example-model", object: "model", owned_by: "halogen" }];
+const grafted = await applyHalogenHealth(baseUrl, halogenModels, 2000, undefined, "example-host:8080");
 check("grafts meta.n_ctx from /health", halogenModels[0].meta?.n_ctx === 262144, String(halogenModels[0].meta?.n_ctx));
 check("grafts max_model_len from /health", halogenModels[0].max_model_len === 262144, String(halogenModels[0].max_model_len));
 check("returns vision to the caller", grafted?.vision === true, String(grafted?.vision));
 
 healthMode = "error";
-const stalled: LlamaCppModel[] = [{ id: "halogen-qwen3.8-flash-next", object: "model", owned_by: "halogen" }];
-await applyHalogenHealth(baseUrl, stalled, 2000, undefined, "bruma:8081");
+const stalled: LlamaCppModel[] = [{ id: "halogen-example-model", object: "model", owned_by: "halogen" }];
+await applyHalogenHealth(baseUrl, stalled, 2000, undefined, "example-host:8080");
 check("sticky context reused when /health stalls", stalled[0].meta?.n_ctx === 262144, String(stalled[0].meta?.n_ctx));
 shared.halogenCtx.clear();
 
@@ -90,13 +90,13 @@ console.log("halogen: buildModelMetadata vision");
 
 setActiveConfig({ servers: [], settings: { ...DEFAULT_SETTINGS }, modelOptions: {} });
 shared.compactModelIds.clear();
-const plain: LlamaCppModel = { id: "halogen-qwen3.8-flash-next", object: "model", owned_by: "halogen" };
+const plain: LlamaCppModel = { id: "halogen-example-model", object: "model", owned_by: "halogen" };
 
-const textOnly = buildModelMetadata("halogen-qwen3.8-flash-next", plain, undefined, undefined, "llamacpp");
+const textOnly = buildModelMetadata("halogen-example-model", plain, undefined, undefined, "llamacpp");
 check("no health → vision undefined", textOnly.vision === undefined, String(textOnly.vision));
 
 const withVision = buildModelMetadata(
-	"halogen-qwen3.8-flash-next",
+	"halogen-example-model",
 	plain,
 	undefined,
 	undefined,
@@ -109,10 +109,10 @@ check("health.vision=true → meta.vision true", withVision.vision === true, Str
 setActiveConfig({
 	servers: [],
 	settings: { ...DEFAULT_SETTINGS },
-	modelOptions: { "halogen-qwen3.8-flash-next": { vision: false } },
+	modelOptions: { "halogen-example-model": { vision: false } },
 });
 const overridden = buildModelMetadata(
-	"halogen-qwen3.8-flash-next",
+	"halogen-example-model",
 	plain,
 	undefined,
 	undefined,
@@ -141,7 +141,7 @@ check("LM Studio stays thinking-free", makeCompat("lmstudio").thinkingFormat ===
 console.log("halogen: registration");
 
 setActiveConfig({
-	servers: [{ id: "bruma", host: "bruma", ports: [8081], enabled: true }],
+	servers: [{ id: "example-host", host: "example-host", ports: [8080], enabled: true }],
 	settings: { ...DEFAULT_SETTINGS },
 	modelOptions: {},
 });
@@ -159,7 +159,7 @@ const pi: any = {
 };
 
 const regConfig: InfraConfig = {
-	servers: [{ id: "bruma", host: "bruma", ports: [8081], enabled: true }],
+	servers: [{ id: "example-host", host: "example-host", ports: [8080], enabled: true }],
 	settings: { ...DEFAULT_SETTINGS },
 	modelOptions: {},
 };
@@ -171,24 +171,24 @@ const scan: ScanResult = {
 	endpoints: [
 		{
 			ok: true,
-			serverId: "bruma",
-			label: "bruma",
-			host: "bruma",
-			port: 8081,
-			baseUrl: "http://bruma:8081/v1",
+			serverId: "example-host",
+			label: "example-host",
+			host: "example-host",
+			port: 8080,
+			baseUrl: "http://example-host:8080/v1",
 			// halogen is classified as llama.cpp family (no own kind).
 			server: "llamacpp",
 			mode: "single",
 			latencyMs: 1,
-			models: [{ id: "halogen-qwen3.8-flash-next", object: "model", owned_by: "halogen", meta: { n_ctx: 262144 } }],
-			meta: new Map([["halogen-qwen3.8-flash-next", { vision: true }]]),
+			models: [{ id: "halogen-example-model", object: "model", owned_by: "halogen", meta: { n_ctx: 262144 } }],
+			meta: new Map([["halogen-example-model", { vision: true }]]),
 		},
 	],
 };
 
 const models = buildAndRegisterProvider(pi, scan, regConfig, { persistCache: false });
 const model = models[0];
-check("halogen model registered", model?.serverModelId === "halogen-qwen3.8-flash-next", String(model?.serverModelId));
+check("halogen model registered", model?.serverModelId === "halogen-example-model", String(model?.serverModelId));
 check("vision → input includes image", model?.input.includes("image") === true, JSON.stringify(model?.input));
 check("registered with the real context", model?.contextWindow === 262144, String(model?.contextWindow));
 check(
