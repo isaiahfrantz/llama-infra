@@ -275,41 +275,69 @@ export function cleanModelName(rawId: string): string {
 /**
  * halogen (owned_by:"halogen") is a proprietary OpenAI-compatible engine: it
  * publishes neither /props nor meta.n_ctx in /v1/models — the context lives
- * only in /health (context / slot_ctx). Without this the registration chain
- * falls back to 32768 and pi compacts way too early. Probe /health once per
- * scan and graft the numbers onto the model entries.
+ * only in /health (context / slot_ctx), and its vision capability only in
+ * /health.vision.enabled. Without this the registration chain falls back to
+ * 32768 and pi compacts way too early, and images are rejected because pi
+ * thinks the model is text-only. Probe /health once per scan and graft the
+ * numbers onto the model entries.
  */
+export interface EngineHealth {
+	/** Served context (slot_ctx preferred, else context). */
+	context?: number;
+	/** /health.vision.enabled — halogen serves images when true. */
+	vision?: boolean;
+}
+
+/** Read GET /health (halogen-flash-server). Returns undefined when the server
+ *  has no /health or does not answer. */
+export async function fetchEngineHealth(
+	baseUrl: string,
+	timeoutMs: number,
+	apiKey?: string,
+): Promise<EngineHealth | undefined> {
+	const rootUrl = baseUrl.replace(/\/v1\/?$/, "");
+	// /health probes the engine (seconds when busy); the generic 2 s discovery
+	// timeout is too short for it. Give this one a floor of 8 s.
+	const probeMs = Math.max(timeoutMs, 8000);
+	try {
+		const { status, body } = await httpGet(`${rootUrl}/health`, probeMs, apiKey);
+		if (status < 200 || status >= 300) return undefined;
+		const h = JSON.parse(body) as {
+			context?: number;
+			slot_ctx?: number;
+			vision?: { enabled?: boolean };
+		};
+		const out: EngineHealth = {};
+		const ctx = h.slot_ctx ?? h.context;
+		if (typeof ctx === "number" && ctx > 0) out.context = ctx;
+		if (h.vision?.enabled === true) out.vision = true;
+		return out;
+	} catch {
+		// no /health
+		return undefined;
+	}
+}
+
 export async function applyHalogenHealth(
 	baseUrl: string,
 	models: LlamaCppModel[],
 	timeoutMs: number,
 	apiKey?: string,
 	hostKey?: string,
-): Promise<void> {
-	const rootUrl = baseUrl.replace(/\/v1\/?$/, "");
-	// /health probes the engine (seconds when busy); the generic 2 s discovery
-	// timeout is too short for it. Give this one a floor of 8 s.
-	const probeMs = Math.max(timeoutMs, 8000);
-	let ctx: number | undefined;
-	try {
-		const { status, body } = await httpGet(`${rootUrl}/health`, probeMs, apiKey);
-		if (status >= 200 && status < 300) {
-			const h = JSON.parse(body) as { context?: number; slot_ctx?: number };
-			const c = h.slot_ctx ?? h.context;
-			if (typeof c === "number" && c > 0) ctx = c;
-		}
-	} catch {
-		// engine busy / stall: fall back to the sticky value below
-	}
+): Promise<EngineHealth | undefined> {
+	const health = await fetchEngineHealth(baseUrl, timeoutMs, apiKey);
+	let ctx = health?.context;
 	if (hostKey) {
 		if (ctx !== undefined) shared.halogenCtx.set(hostKey, ctx);
 		else ctx = shared.halogenCtx.get(hostKey); // transient miss: do not regress to 32768
 	}
-	if (typeof ctx !== "number" || ctx <= 0) return;
-	for (const m of models) {
-		m.meta = { ...(m.meta ?? {}), n_ctx: m.meta?.n_ctx ?? ctx };
-		m.max_model_len = m.max_model_len ?? ctx;
+	if (typeof ctx === "number" && ctx > 0) {
+		for (const m of models) {
+			m.meta = { ...(m.meta ?? {}), n_ctx: m.meta?.n_ctx ?? ctx };
+			m.max_model_len = m.max_model_len ?? ctx;
+		}
 	}
+	return health;
 }
 
 export async function fetchServerProps(
@@ -481,6 +509,7 @@ export function buildModelMetadata(
 	props: ServerProps | undefined,
 	local: LocalServerInfo | undefined,
 	kind?: ServerKind | "unknown",
+	health?: { vision?: boolean },
 ): ModelMetadata {
 	const meta: ModelMetadata = {};
 
@@ -494,6 +523,9 @@ export function buildModelMetadata(
 	if (!meta.vision && (entry.lmStudio?.capabilities?.vision === true || entry.lmStudio?.type === "vlm")) {
 		meta.vision = true;
 	}
+	// halogen publishes neither /props nor architecture.input_modalities: its
+	// vision capability lives only in /health.vision.enabled.
+	if (!meta.vision && health?.vision) meta.vision = true;
 	if (!meta.vision && local?.hasMmproj) meta.vision = true;
 	// Local engine args are ground truth for OpenAI-compatible engines:
 	// --language-model-only makes vLLM answer 400 'At most 0 image(s)', while
@@ -581,8 +613,9 @@ export async function fetchModelsFromEndpoint(
 		if (mode === "router") props = undefined;
 
 		const kind = await detectServerKind(baseUrl, models, props, lmStudioCatalog);
+		let engineHealth: EngineHealth | undefined;
 		if (kind === "llamacpp" && props === undefined && models.some((m) => String(m.owned_by ?? "").toLowerCase() === "halogen")) {
-			await applyHalogenHealth(baseUrl, models, settings.discoveryTimeoutMs, srv.apiKey, `${srv.host}:${port}`);
+			engineHealth = await applyHalogenHealth(baseUrl, models, settings.discoveryTimeoutMs, srv.apiKey, `${srv.host}:${port}`);
 		}
 		if (kind === "lucebox") {
 			props = (await fetchServerProps(baseUrl, settings.discoveryTimeoutMs, srv.apiKey)) ?? props;
@@ -596,7 +629,7 @@ export async function fetchModelsFromEndpoint(
 			if (mode === "router" && !model.architecture?.input_modalities && model.status?.value === "loaded") {
 				modelProps = (await fetchServerProps(baseUrl, settings.discoveryTimeoutMs, srv.apiKey, rawId)) ?? undefined;
 			}
-			ep.meta.set(rawId, buildModelMetadata(rawId, model, modelProps, local, kind));
+			ep.meta.set(rawId, buildModelMetadata(rawId, model, modelProps, local, kind, engineHealth));
 		}
 
 		ep.server = kind;

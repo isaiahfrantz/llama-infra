@@ -365,6 +365,12 @@ export function makeCompat(
 		maxTokensField: "max_tokens" as const,
 		supportsUsageInStreaming: usageInStreaming,
 		supportsStrictMode: false,
+		// pi sends chat_template_kwargs{enable_thinking,preserve_thinking} when the
+		// format is "qwen-chat-template". halogen accepts it as-is
+		// (/health.chat_template_kwargs) and defaults to reasoning_effort=xhigh, so
+		// without this pi cannot turn its thinking OFF; llama.cpp Qwen templates read
+		// the same kwargs natively. Non-Qwen templates simply ignore the extra vars.
+		...(kind === "llamacpp" ? { thinkingFormat: "qwen-chat-template" as const } : {}),
 		...(thinkingField ? { thinkingTokenBudgetField: thinkingField } : {}),
 	};
 }

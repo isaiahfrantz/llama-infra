@@ -18,7 +18,7 @@ Every endpoint llama-infra talks to runs llama.cpp, a direct variant, or an Open
 | **lucebox** | `GET /props` with `server.name: "luce-*"` | DeepSeek dflash server with rich metadata |
 | **LM Studio** | `GET /v1/models` + optional `/api/v1/models` metadata | Local OpenAI-compatible server backed by llama.cpp; default port `1234` |
 | **vLLM / SGLang / TGI** | `owned_by: "vllm"` in `GET /v1/models` | OpenAI-compatible runners; context from `max_model_len`; **no** `/props`, **no** `/slots`; thinking via `thinking_token_budget` |
-| **halogen** | `owned_by: "halogen"` in `GET /v1/models` with **no** `/props` | OpenAI-compatible engine; context read from `GET /health` (`slot_ctx` / `context`); metrics served in the `llamacpp:` namespace (see [halogen](#halogen)) |
+| **halogen** | `owned_by: "halogen"` in `GET /v1/models` with **no** `/props` | OpenAI-compatible engine; context **and vision** read from `GET /health` (`slot_ctx` / `context`, `vision.enabled`); thinking on/off via `chat_template_kwargs.enable_thinking`; metrics served in the `llamacpp:` namespace (see [halogen](#halogen)) |
 
 Anything else (Ollama, cloud APIs…) is out of scope — use pi's built-in providers for those.
 
@@ -31,13 +31,13 @@ Anything else (Ollama, cloud APIs…) is out of scope — use pi's built-in prov
 - **Per-model metadata badges** — 👁️ vision (mmproj / modalities), 🚀 drafter (speculative decoding), 🗜️ quant tag from GGUF filename, 🧠 KV cache quantization (from server args or `/proc`)
 - **Live speed & metrics** — a constantly updating footer reading of the active model's prefill (⚡) and generation (🔥) token speed, measured straight from the stream (per token, ~10 updates/s); when pi is idle it also mirrors other clients the server's `/metrics` endpoint reports. Lives in the footer's status line, so no extra terminal row is taken. Works even without `--metrics`
 - **Energy cost (💰)** — local models report no per-token cost, so llama-infra estimates the **electricity** the inference consumed: configure each machine's power draw (kW) and tariff (per kWh) once, and every assistant message carries a realistic `usage.cost.total` (kW × €/kWh × measured request time) — pi's native cost footer, session stats and any consumer reading usage (e.g. trimegisto agents) all show it. Currency selector: USD / EUR / GBP / CNY
-- **Thinking budgets** — llama.cpp accepts `thinking_budget_tokens` per request; configure budgets per thinking level (minimal/low/medium/high/xhigh/max) per model; models with budgets are registered with reasoning enabled
+- **Thinking budgets** — llama.cpp accepts `thinking_budget_tokens` per request; configure budgets per thinking level (minimal/low/medium/high/xhigh/max) per model; models with budgets are registered with reasoning enabled. llama.cpp-family models are registered with the `qwen-chat-template` thinking format, so pi also sends `chat_template_kwargs.enable_thinking` and the **off** level actually stops reasoning (required for halogen, which defaults to `xhigh`)
 - **Header warmup** — pre-caches the system prompt KV on llama.cpp-family servers so the first real request is faster
 - **LM Studio support** — uses LM Studio's OpenAI-compatible `/v1` API, enriches names/context/quant/vision from `/api/v1/models` (or legacy `/api/v0/models`), and avoids llama.cpp-only request fields
 - **vLLM / SGLang / TGI support** — auto-detects `owned_by: "vllm"`, reads the context window from `max_model_len`, normalizes the `vllm:` metrics namespace, and uses vLLM's own `thinking_token_budget` field (see [vLLM / SGLang / TGI](#vllm--sglang--tgi))
-- **halogen support** — auto-detects `owned_by: "halogen"` and pulls the real context window from `/health` (`slot_ctx` / `context`), with an 8 s probe floor and a sticky per-machine value, so pi never compacts at the 32k fallback on a 262k model (see [halogen](#halogen))
+- **halogen support** — auto-detects `owned_by: "halogen"` and reads **both** the real context window (`/health` `slot_ctx` / `context`) and the vision capability (`/health.vision.enabled`), with an 8 s probe floor and a sticky per-machine context, so pi never compacts at the 32k fallback on a 262k model and vision-enabled models register with the 👁️ badge; thinking can be turned **off/on** through `chat_template_kwargs.enable_thinking` (see [halogen](#halogen))
 - **ZINC workaround** — ZINC rejects non-empty model IDs; the payload hook rewrites the request and normalizes tool definitions automatically
-- **Vision detection** — scans `/proc` for local llama-server processes launched with `--mmproj` and marks those models as image-capable; also reads server-reported `modalities` / `input_modalities`
+- **Vision detection** — scans `/proc` for local llama-server processes launched with `--mmproj` and marks those models as image-capable; also reads server-reported `modalities` / `input_modalities` and halogen's `/health.vision.enabled`
 - **Native configuration UI** — everything configurable through `/llama-infra config`; the discovery settings panel uses pi's own `/settings` component (`SettingsList`): one row per option with its value, a help line under the list explaining the highlighted option, Enter/Space to change, fuzzy search; no config file editing required
 - **Legacy migration** — auto-migrates an existing `~/.pi/agent/local-models.json` on first run
 
@@ -212,7 +212,7 @@ curl -s http://127.0.0.1:8081/health | jq '{context, slot_ctx, slots}'
 # { "context": 262144, "slot_ctx": 262144, "slots": 3 }
 ```
 
-**Context grafting** — once per scan, llama-infra probes `/health` at the server root and grafts `slot_ctx` (preferred) or `context` onto every model as `meta.n_ctx` and `max_model_len`, never overwriting a value the server did publish.
+**Context grafting** — once per scan, llama-infra probes `/health` at the server root and grafts `slot_ctx` (preferred) or `context` onto every model as `meta.n_ctx` and `max_model_len`, never overwriting a value the server did publish. The same probe reads `vision.enabled` and marks the model image-capable.
 
 **Slow-health guard (8 s floor)** — `/health` pings the engine itself (`engine.probe_s`), so it can take seconds while a request is in flight or under memory pressure. The generic `discoveryTimeoutMs` (2 s by default) is too short for that: the health probe gets a floor of **8 s** regardless, so a busy engine never looks like a missing one.
 
@@ -226,21 +226,27 @@ curl -s http://127.0.0.1:8081/health | jq '{context, slot_ctx, slots}'
 | Compaction | driven by that real context |
 | Metrics | `/metrics` is served in the `llamacpp:` namespace → footer ⚡ prefill / 🔥 generation work unchanged |
 | Long generations | 32k output cap and the 20 minute timeout floor, same as llama.cpp |
-| Thinking budgets | injected under llama.cpp's field name `thinking_budget_tokens` (the family default) |
+| Vision | auto-detected from `/health.vision.enabled` → the model registers as image-capable and shows the 👁️ badge |
+| Thinking on/off | pi sends `chat_template_kwargs.enable_thinking` (level off → `false`, any thinking level → `true`, always with `preserve_thinking: true`) |
+| Thinking budgets | injected under llama.cpp's field name `thinking_budget_tokens` (halogen lists it in `/health.thinking_control_aliases`) |
 
-> **Thinking budgets on halogen** — the engine publishes its own knobs as `reasoning_effort` and `max_thinking_tokens`, and its `/health` `supported` list is the authority on what a request may set. Whether it also maps llama.cpp's `thinking_budget_tokens` is **unverified**: treat per-level budgets on halogen as best-effort and check `/health` before relying on them.
+**Thinking control** — halogen boots with `reasoning_effort="xhigh"` (`/health.reasoning_effort_default`), so without a request-side switch every answer would spend its budget in `reasoning` and leave `content` empty. llama-infra registers halogen models with pi's `qwen-chat-template` thinking format, which makes pi send:
 
-**Manual overrides** — halogen reports `vision.enabled`, `drafters_available` and `drafter_default` in `/health`, but llama-infra reads only the context from it today. Set the rest per model:
+- level **off** → `chat_template_kwargs: { enable_thinking: false, preserve_thinking: true }`
+- level **minimal…max** → `enable_thinking: true` plus the per-level `thinking_budget_tokens`
+
+The same format is applied to the whole llama.cpp family (their Qwen templates read the same kwargs; other templates ignore the extra variables).
+
+**Manual overrides** — halogen reports `drafters_available` and `drafter_default` in `/health`, but llama-infra does not read the drafter yet. Set it per model:
 
 ```json
-{ "modelOptions": { "halogen-qwen3.8-flash-next": { "vision": true, "drafter": "mtp" } } }
+{ "modelOptions": { "halogen-qwen3.8-flash-next": { "drafter": "mtp" } } }
 ```
 
 **Known limitations**
 
-- Vision is not auto-detected — force `modelOptions[id].vision = true` (the server's own `/health` reports `vision.enabled`).
 - The 🚀 drafter badge stays empty unless set via `modelOptions[id].drafter`.
-- A halogen server that has never answered `/health` registers with the 32,768 fallback until the first successful probe (then the value sticks).
+- A halogen server that has never answered `/health` registers with the 32,768 fallback and no vision flag until the first successful probe (then the context sticks).
 - halogen takes images as `data:` URLs or bare base64 and refuses `http(s)` image URLs — a server-side contract, not a llama-infra setting.
 
 ## Commands

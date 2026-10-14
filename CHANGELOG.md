@@ -5,6 +5,22 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.8.0] - 2026-10-14
+
+### Added
+
+- **halogen vision detection** — the extension already read `GET /health` for the context window; it now also reads `vision.enabled`, so a halogen model that serves images registers as image-capable (👁️ badge, `input: ["text", "image"]`) with no `modelOptions[id].vision` override.
+- **Thinking on/off on llama.cpp-family servers (halogen included)** — `makeCompat()` now exposes `thinkingFormat: "qwen-chat-template"`, so pi sends `chat_template_kwargs: { enable_thinking, preserve_thinking }`. This is what lets halogen's default `reasoning_effort="xhigh"` be turned **off** at the `off` level (answers were otherwise all reasoning with empty content); thinking levels still send the per-level `thinking_budget_tokens`.
+
+### Changed
+
+- `fetchEngineHealth()` extracted from the halogen `/health` probe and now returns `{ context, vision }`; `applyHalogenHealth()` grafts the context (sticky per `host:port`) and returns the health so the vision flag reaches `buildModelMetadata()`.
+- `CompatProfile` gained the `thinkingFormat` field (currently `qwen-chat-template`).
+
+### Tests
+
+- `test/halogen.test.ts` — `/health` parsing, sticky context, vision in metadata (and manual override), the new compat thinking format, and end-to-end halogen registration.
+
 ## [1.7.0] - 2026-09-30
 
 ### Added

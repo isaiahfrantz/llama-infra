@@ -283,6 +283,21 @@ export interface CompatProfile {
 	supportsUsageInStreaming: boolean;
 	supportsStrictMode: boolean;
 	thinkingTokenBudgetField?: string;
+	/** pi's per-engine thinking control. `qwen-chat-template` makes pi send
+	 *  `chat_template_kwargs:{enable_thinking,preserve_thinking}` — what halogen
+	 *  (and llama.cpp Qwen templates) read to turn thinking off/on. */
+	thinkingFormat?:
+		| "openai"
+		| "openrouter"
+		| "deepseek"
+		| "together"
+		| "baseten"
+		| "zai"
+		| "qwen"
+		| "chat-template"
+		| "qwen-chat-template"
+		| "string-thinking"
+		| "ant-ling";
 }
 
 // Re-exports for convenience to keep call-sites stable.
