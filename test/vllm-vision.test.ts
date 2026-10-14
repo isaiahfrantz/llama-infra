@@ -52,13 +52,13 @@ check("--mmproj x.gguf → acceptsImages undefined", mmproj.acceptsImages === un
 console.log("vllm-vision: looksLikeOpenAiEngine");
 
 check(
-	"paiton-qwen38 wrapper (--served-model-name + --max-model-len) → true",
+	"custom-serve wrapper (--served-model-name + --max-model-len) → true",
 	looksLikeOpenAiEngine([
 		"python3",
-		"/usr/local/bin/paiton-qwen38",
+		"/usr/local/bin/custom-serve",
 		"serve",
 		"--served-model-name",
-		"Qwen3.8-27B",
+		"Example-27B",
 		"--max-model-len",
 		"80000",
 		"--port",
@@ -82,30 +82,30 @@ console.log("vllm-vision: buildModelMetadata");
 setActiveConfig(undefined);
 check(
 	"acceptsImages:true → vision true",
-	buildModelMetadata("Qwen3.8-27B", { id: "Qwen3.8-27B" } as any, undefined, { port: 8082, acceptsImages: true }, "vllm")
+	buildModelMetadata("Example-27B", { id: "Example-27B" } as any, undefined, { port: 8000, acceptsImages: true }, "vllm")
 		.vision === true,
 );
 check(
 	"acceptsImages:false overrides props modalities.vision",
 	buildModelMetadata(
-		"Qwen3.8-27B",
-		{ id: "Qwen3.8-27B" } as any,
+		"Example-27B",
+		{ id: "Example-27B" } as any,
 		{ modalities: { vision: true } } as any,
-		{ port: 8082, acceptsImages: false },
+		{ port: 8000, acceptsImages: false },
 		"vllm",
 	).vision === false,
 );
 check(
 	"acceptsImages:undefined and no props → vision undefined",
-	buildModelMetadata("Qwen3.8-27B", { id: "Qwen3.8-27B" } as any, undefined, { port: 8082, acceptsImages: undefined }, "vllm")
+	buildModelMetadata("Example-27B", { id: "Example-27B" } as any, undefined, { port: 8000, acceptsImages: undefined }, "vllm")
 		.vision === undefined,
 );
 
 // Manual override must still win over the local engine args.
-setActiveConfig({ modelOptions: { "Qwen3.8-27B": { vision: true } } } as any);
+setActiveConfig({ modelOptions: { "Example-27B": { vision: true } } } as any);
 check(
 	"manual modelOptions.vision:true wins over acceptsImages:false",
-	buildModelMetadata("Qwen3.8-27B", { id: "Qwen3.8-27B" } as any, undefined, { port: 8082, acceptsImages: false }, "vllm")
+	buildModelMetadata("Example-27B", { id: "Example-27B" } as any, undefined, { port: 8000, acceptsImages: false }, "vllm")
 		.vision === true,
 );
 setActiveConfig(undefined);

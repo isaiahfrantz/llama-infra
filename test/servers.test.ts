@@ -16,14 +16,14 @@ function check(label: string, cond: boolean, detail?: string): void {
 
 console.log("servers: host uniqueness must be per (host, port)");
 
-const bruma = { id: "bruma", host: "bruma", ports: [8080, 8081], enabled: true };
-const brumaLm = { id: "bruma-lm", host: "bruma", ports: [1234], enabled: true };
-const brumaOverlap = { id: "bruma-x", host: "bruma", ports: [8081, 9000], enabled: true };
+const tower = { id: "gpu-host", host: "gpu-host", ports: [8080, 8081], enabled: true };
+const towerLm = { id: "gpu-host-lm", host: "gpu-host", ports: [1234], enabled: true };
+const towerOverlap = { id: "gpu-host-x", host: "gpu-host", ports: [8081, 9000], enabled: true };
 const other = { id: "other", host: "other", ports: [8080], enabled: true };
 
-check("same host + same port collides", serversShareEndpoint(bruma, brumaOverlap));
-check("same host + disjoint ports allowed", !serversShareEndpoint(bruma, brumaLm));
-check("different host + same port allowed", !serversShareEndpoint(bruma, other));
+check("same host + same port collides", serversShareEndpoint(tower, towerOverlap));
+check("same host + disjoint ports allowed", !serversShareEndpoint(tower, towerLm));
+check("different host + same port allowed", !serversShareEndpoint(tower, other));
 check("different host + different port allowed", !serversShareEndpoint({ host: "a", ports: [1] }, { host: "b", ports: [2] }));
 
 if (failures > 0) {

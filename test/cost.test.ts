@@ -19,7 +19,7 @@ function check(label: string, cond: boolean, detail?: string): void {
 // ── cost.ts: math ──────────────────────────────────────────────────────────
 console.log("cost.ts: energy math");
 {
-	const profile = { kW: 0.15, ratePerKwh: 0.21, label: "bruma" };
+	const profile = { kW: 0.15, ratePerKwh: 0.21, label: "gpu-host" };
 	// 1 h of inference at 150 W × 0.21 €/kWh = 0.0315 €
 	check("1h @150W × 0.21 = €0.0315", Math.abs(energyCost(profile, 3_600_000) - 0.0315) < 1e-12);
 	// 2 min = 120_000 ms → 0.00105 €
@@ -30,11 +30,11 @@ console.log("cost.ts: energy math");
 console.log("cost.ts: profile resolution");
 {
 	const servers = [
-		{ id: "local", host: "127.0.0.1", label: "Local", ports: [8080, 8081], enabled: true, costProfile: { kW: 0.15, ratePerKwh: 0.21, label: "bruma" } },
-		{ id: "tower", host: "bruma", label: "Bruma", ports: [8081], enabled: true },
+		{ id: "local", host: "127.0.0.1", label: "Local", ports: [8080, 8081], enabled: true, costProfile: { kW: 0.15, ratePerKwh: 0.21, label: "gpu-host" } },
+		{ id: "tower", host: "gpu-host", label: "gpu-host", ports: [8080], enabled: true },
 	];
 	check("serverId match → profile", resolveCostProfile({ id: "llama-infra/qwen", endpoint: { serverId: "local" } }, servers)?.kW === 0.15);
-	check("host fallback hits local for 127.0.0.1", resolveCostProfile({ id: "x", endpoint: { host: "127.0.0.1" } }, servers)?.label === "bruma");
+	check("host fallback hits local for 127.0.0.1", resolveCostProfile({ id: "x", endpoint: { host: "127.0.0.1" } }, servers)?.label === "gpu-host");
 	check("no profile server → null", resolveCostProfile({ id: "llama-infra/ling", endpoint: { serverId: "tower" } }, servers) === null);
 	check("no endpoint + no pattern → null", resolveCostProfile({ id: "deepseek/x" }, servers) === null);
 }
@@ -54,7 +54,7 @@ console.log("cost.ts: currency formatting");
 // ── cost-tracker.ts: lifecycle ─────────────────────────────────────────────
 console.log("cost-tracker: lifecycle");
 {
-	const profile = { kW: 0.15, ratePerKwh: 0.21, label: "bruma" };
+	const profile = { kW: 0.15, ratePerKwh: 0.21, label: "gpu-host" };
 	const statuses: string[] = [];
 	const tracker = createCostTracker({
 		isActive: () => true,

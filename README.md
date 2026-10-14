@@ -116,7 +116,7 @@ curl -s http://127.0.0.1:8081/v1/models | jq -r '.data[0] | "\(.id) owned_by=\(.
 - `--language-model-only`, or `--limit-mm-per-prompt '{"image":0}'` → **text-only**;
 - `--limit-mm-per-prompt '{"image":N}'` with `N > 0` → **vision**.
 
-Wrappers whose process is not literally named `vllm` are still recognized by their flag surface — an OpenAI-style launcher that carries `--served-model-name` together with `--max-model-len`, `--tensor-parallel-size` or `--gpu-memory-utilization` — so a line such as `python3 /usr/local/bin/paiton-qwen38 serve … --served-model-name my-model --max-model-len 32768` is covered too.
+Wrappers whose process is not literally named `vllm` are still recognized by their flag surface — an OpenAI-style launcher that carries `--served-model-name` together with `--max-model-len`, `--tensor-parallel-size` or `--gpu-memory-utilization` — so a line such as `python3 /usr/local/bin/custom-serve serve … --served-model-name my-model --max-model-len 32768` is covered too.
 
 The manual `modelOptions[id].vision` override remains the **final word**: it wins over both server-reported data and the process-arg ground truth, and it is still **required for remote/non-loopback vLLM servers**, which expose no `/proc`. Set vision/drafter explicitly per model under `modelOptions`. The key may be the **raw server id** (`/v1/models` → `id`) or the **registered name shown by `/model`**, which appends the ` (host:port)` suffix:
 
@@ -165,8 +165,8 @@ The resolver accepts both forms (raw id, registered display id, and the legacy `
     { "id": "local", "host": "127.0.0.1", "label": "Local",
       "ports": [8080, 8081, 8082], "enabled": true,
       "costProfile": { "kW": 0.095, "ratePerKwh": 0.15 } },
-    { "id": "strix", "host": "bruma", "label": "bruma (Strix Halo)",
-      "ports": [8081], "enabled": true }
+    { "id": "tower", "host": "gpu-host", "label": "gpu-host",
+      "ports": [8080], "enabled": true }
   ],
   "settings": {
     "discoveryTimeoutMs": 2000,
@@ -187,7 +187,7 @@ Per-level thinking budget for the registered vLLM model (injected as `thinking_t
 ```json
 {
   "modelOptions": {
-    "Ornith1.5-Ciru-Halo-Agent (127.0.0.1:8081)": {
+    "example-vllm-model (127.0.0.1:8081)": {
       "thinkingBudgets": { "minimal": 256, "low": 1024, "medium": 4096, "high": 16384 }
     },
     "my-hidden-vllm": {
@@ -282,8 +282,8 @@ Shows every discovered model with metadata badges:
 ```
 📋 Discovered models (8)
 
- 1. Qwen3.6-27B-UD-Q3_K_XL (local:8080)   👁️ 🗜️ UD-Q3_K_XL
- 2. DeepSeek-V4-Flash-ROCMFP2 (local:8081)          🗜️ ROCMFP2
+ 1. Example-27B-Instruct (local:8080)     👁️ 🗜️ Q4_K_M
+ 2. Example-Model (local:8081)            🗜️ Q4_K_M
  3. Meta-Llama-3.1-8B (myserver:8080)     🚀 draft-model   🗜️ Q4_K_M
  4. gemma-3-4b-it (myserver:8081)         👁️ 🗜️ Q4_K_M
 ```
@@ -320,7 +320,7 @@ Everything is configurable through the UI, but the persisted file is `~/.pi/agen
       "ports": [8000, 8001, 8002, 8080, 8081, 8082, 1234],
       "enabled": true,
       "probeDs4": false,
-      "costProfile": { "kW": 0.15, "ratePerKwh": 0.21, "label": "bruma 27B" }
+      "costProfile": { "kW": 0.15, "ratePerKwh": 0.21, "label": "gpu-host 27B" }
     },
     {
       "id": "myserver",
@@ -349,7 +349,7 @@ Everything is configurable through the UI, but the persisted file is `~/.pi/agen
     "costTracking": true
   },
   "modelOptions": {
-    "Qwen3.6-27B (myserver:8080)": {
+    "Example-27B (myserver:8080)": {
       "thinkingBudgets": {
         "minimal": 256,
         "low": 1024,
@@ -433,7 +433,7 @@ The per-model override is then **clamped to the model's `contextWindow`**, so it
 
 ## Model ID Format
 
-Models are registered with compact display ids: `ModelName (host:port)`, e.g. `Qwen3.6-27B-UD-Q3_K_XL (myserver:8080)` — the compact model name plus the machine serving it in parentheses, matching how pi shows native provider models. Localhost servers (`127.0.0.1`, `localhost`) use `local:port` in the tag.
+Models are registered with compact display ids: `ModelName (host:port)`, e.g. `Example-27B-Instruct (myserver:8080)` — the compact model name plus the machine serving it in parentheses, matching how pi shows native provider models. Localhost servers (`127.0.0.1`, `localhost`) use `local:port` in the tag.
 
 pi sends the compact id to the extension's request hook, which transparently rewrites it to the raw server-side id (the GGUF path, alias or router id the server advertised in `/v1/models`) before the request leaves pi. Config keys under `modelOptions` use the compact id; legacy `host:port/model` keys are migrated automatically on the first scan.
 
@@ -493,7 +493,7 @@ Config lives in `~/.pi/agent/llama-infra.json`:
 {
   "servers": [
     { "id": "local", "host": "127.0.0.1", "ports": [8000, 8080, 8081], "enabled": true,
-      "costProfile": { "kW": 0.15, "ratePerKwh": 0.21, "label": "bruma 27B" } }
+      "costProfile": { "kW": 0.15, "ratePerKwh": 0.21, "label": "gpu-host 27B" } }
   ],
   "settings": { "currency": "eur", "costTracking": true }
 }

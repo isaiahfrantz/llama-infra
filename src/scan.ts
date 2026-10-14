@@ -115,15 +115,16 @@ function portFromArgs(args: string[]): number | undefined {
 	return undefined;
 }
 
-/** vLLM/ROCm engines run as `python -m vllm…`, `VLLM::EngineCore` or `ornith…`. */
+/** vLLM/ROCm engines run as `python -m vllm…` or `VLLM::EngineCore`; renamed
+ *  wrappers are caught by the flag surface in looksLikeOpenAiEngine(). */
 function looksLikeVllmProcess(args: string[]): boolean {
 	const joined = args.join("\0").toLowerCase();
-	return joined.includes("vllm") || joined.includes("ornith");
+	return joined.includes("vllm");
 }
 
 export function looksLikeOpenAiEngine(args: string[]): boolean {
 	const joined = args.join("\0").toLowerCase();
-	if (joined.includes("vllm") || joined.includes("ornith") || joined.includes("sglang")) return true;
+	if (joined.includes("vllm") || joined.includes("sglang")) return true;
 	const has = (f: string) => args.some((a) => a === f || a.startsWith(f + "="));
 	if (!has("--served-model-name")) return false;
 	return has("--max-model-len") || has("--tensor-parallel-size") || has("--gpu-memory-utilization") || has("--kv-cache-dtype") || has("--limit-mm-per-prompt") || has("--language-model-only");

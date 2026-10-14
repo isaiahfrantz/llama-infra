@@ -128,10 +128,10 @@ const pi: any = {
 };
 
 const regConfig: InfraConfig = {
-	servers: [{ id: "bruma-2", host: "bruma", ports: [8082], enabled: true }],
+	servers: [{ id: "gpu-host-2", host: "gpu-host", ports: [8000], enabled: true }],
 	settings: { ...DEFAULT_SETTINGS },
 	// vLLM whose kind detection failed (no owned_by) → override forces the field.
-	modelOptions: { "Qwen3.8-27B": { thinkingBudgetField: "thinking_token_budget" } },
+	modelOptions: { "Example-27B": { thinkingBudgetField: "thinking_token_budget" } },
 };
 setActiveConfig(regConfig);
 
@@ -142,16 +142,16 @@ const scan: ScanResult = {
 	endpoints: [
 		{
 			ok: true,
-			serverId: "bruma-2",
-			label: "bruma",
-			host: "bruma",
-			port: 8082,
-			baseUrl: "http://bruma:8082/v1",
+			serverId: "gpu-host-2",
+			label: "gpu-host",
+			host: "gpu-host",
+			port: 8000,
+			baseUrl: "http://gpu-host:8000/v1",
 			// Deliberately NOT vllm: the override is the only source of truth.
 			server: "llamacpp",
 			mode: "single",
 			latencyMs: 1,
-			models: [{ id: "Qwen3.8-27B", object: "model", owned_by: "unknown", meta: { n_ctx: 65536 } }],
+			models: [{ id: "Example-27B", object: "model", owned_by: "unknown", meta: { n_ctx: 65536 } }],
 			meta: new Map(),
 		},
 	],

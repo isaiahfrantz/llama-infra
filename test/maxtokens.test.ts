@@ -26,11 +26,11 @@ const pi: any = {
 };
 
 const config: InfraConfig = {
-	servers: [{ id: "bruma", host: "bruma", ports: [8082], enabled: true }],
+	servers: [{ id: "gpu-host", host: "gpu-host", ports: [8000], enabled: true }],
 	settings: { ...DEFAULT_SETTINGS, maxOutputTokens: 32768 },
 	modelOptions: {
 		// (a) display/registered-name key with the ` (host:port)` suffix.
-		"Qwen3.8-27B (bruma:8082)": { maxTokens: 8192 },
+		"Example-27B (gpu-host:8000)": { maxTokens: 8192 },
 		// (b) raw server-id key.
 		"Raw-Key-27B": { maxTokens: 8192 },
 		// (c) larger than the context window -> clamped.
@@ -53,15 +53,15 @@ const scan: ScanResult = {
 	endpoints: [
 		{
 			ok: true,
-			serverId: "bruma",
-			host: "bruma",
-			port: 8082,
-			baseUrl: "http://bruma:8082/v1",
+			serverId: "gpu-host",
+			host: "gpu-host",
+			port: 8000,
+			baseUrl: "http://gpu-host:8000/v1",
 			server: "vllm",
 			mode: "single",
 			latencyMs: 1,
 			models: [
-				{ id: "Qwen3.8-27B", max_model_len: 80000 },
+				{ id: "Example-27B", max_model_len: 80000 },
 				{ id: "Raw-Key-27B", max_model_len: 80000 },
 				{ id: "Clamp-Override", max_model_len: 80000 },
 				{ id: "No-Override", max_model_len: 131072 },
@@ -82,8 +82,8 @@ const cap = (id: string) => byServerId.get(id)?.maxTokens;
 
 check(
 	"(a) override keyed by display id '<raw> (host:port)' wins -> 8192",
-	cap("Qwen3.8-27B") === 8192,
-	String(cap("Qwen3.8-27B")),
+	cap("Example-27B") === 8192,
+	String(cap("Example-27B")),
 );
 check("(b) override keyed by raw server id wins -> 8192", cap("Raw-Key-27B") === 8192, String(cap("Raw-Key-27B")));
 check(
