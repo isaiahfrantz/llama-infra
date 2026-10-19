@@ -85,6 +85,7 @@ type ServerKindLike = ServerKind | "auto" | "unknown";
 /** Tolerant icon + label per server kind; unknown/future kinds never crash. */
 const KIND_META: Record<ServerKindLike, { icon: string; label: string }> = {
 	llamacpp: { icon: "🦙", label: "llama.cpp" },
+	gufo: { icon: "🦉", label: "gufo" },
 	zinc: { icon: "⚡", label: "ZINC" },
 	lucebox: { icon: "💡", label: "lucebox" },
 	dwarfstar: { icon: "🕵️", label: "ds4" },
@@ -101,9 +102,11 @@ function serverKindLabel(kind: string | undefined): string {
 	return `${meta.icon} ${meta.label}`;
 }
 
-/** GGUF/llama.cpp-specific KV cache types are meaningless for vLLM. */
+/** GGUF/llama.cpp-specific KV cache types are meaningless for vLLM, and
+ *  unreachable for gufo: it answers /props with a placeholder, so cache_type_*
+ *  never arrives. Excluding both keeps the badge list honest. */
 function showsGgufKvCache(kind: string | undefined): boolean {
-	return kind !== "vllm";
+	return kind !== "vllm" && kind !== "gufo";
 }
 
 function metadataBadges(m: ModelMetadata | undefined, kind?: string): string {

@@ -5,6 +5,12 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+
+- **gufo server support** ([gufo-org](https://github.com/gufo-org), a llama.cpp fork): detected by `owned_by: "gufo"` in `GET /v1/models` and registered as a new `gufo` kind. The context window comes from `context_length` (gufo's `/props` is a placeholder: **400** without `?model=`, `{template:"",model_info:{}}` with it), vision from `architecture.input_modalities`, and the speed footer reads gufo's `llamacpp:`-namespace metrics. gufo keeps llama.cpp's thinking contract, so models register with the `qwen-chat-template` thinking format and `thinking_budget_tokens`; `chat_template_kwargs.enable_thinking:false`, `reasoning_effort:"none"` and `thinking:{type:"disabled"}` were all verified to stop reasoning on a live endpoint (per-token budgets are accepted but not enforced by that build). The LM Studio catalog probes are skipped for gufo, and GGUF KV-cache badges stay hidden because gufo cannot report them. gufo publishes no max output length, so `maxTokens` remains the client cap (`min(context_length, settings.maxOutputTokens)`) and any future `max_tokens` on `/v1/models` wins automatically. Speculative decoding is read from `GET /slots` (`speculative: true` → the 🚀 drafter badge), because that is the only route that reports it: the `/props` placeholder cannot express it, gufo's `--speculative mtp --mtp-model` flags are unknown to the llama.cpp arg parser, and a containerized gufo is invisible to the local process scan. Prompt warmup stays enabled: gufo honours `cache_prompt` (`usage.prompt_tokens_details.cached_tokens` 62 on a repeat request vs 0 when disabled or omitted). Every gufo claim here is behavioural rather than status-code based, since gufo answers 200 to unknown request fields — including that per-token thinking budgets are ignored in both `thinking_budget_tokens` and gufo's own `reasoning_budget_tokens` spelling, so the budget field is kept for forward-compatibility only. `🎯` spec-accept renders from `llamacpp:spec_decode_*` (70.8% observed); `♻️` does not, because gufo exports no `prefix_cache_hits/queries_total`. Covered by `test/gufo.test.ts`.
+
 ## [1.8.1] - 2026-10-14
 
 ### Changed
