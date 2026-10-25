@@ -58,6 +58,12 @@ export interface ModelOptions {
 
 export interface SettingsConfig {
 	discoveryTimeoutMs: number;
+	/**
+	 * Background re-scan of every enabled endpoint (0 = off). Needed because a model
+	 * swapped on a server that stayed up changes nothing the poller watches: without
+	 * it, discovery only runs at boot, on session_start and on an explicit scan.
+	 */
+	rescanIntervalMs: number;
 	pollIntervalMs: number;
 	pollMaxMs: number;
 	startupGraceMs: number;

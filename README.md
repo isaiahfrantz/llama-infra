@@ -299,6 +299,7 @@ gufo models are registered with pi's `qwen-chat-template` thinking format, so pi
 | `/llama-infra` | Quick status (servers, discovered models, metrics) |
 | `/llama-infra config` | ⚙️ Interactive configuration menu |
 | `/llama-infra scan` | Rescan all servers now |
+| `/llama-infra use <model>` | Switch this session to a discovered model |
 | `/llama-infra status` | Detailed per-endpoint report |
 | `/llama-infra list` | List discovered models with metadata badges |
 | `/llama-infra metrics` | Toggle live speed & metrics in the footer |
@@ -314,9 +315,24 @@ The main config menu branches into submenus:
 - **🧪 Test** — connectivity test of all configured servers
 - **🧠 Thinking budgets** — configure the per-model budget field (auto per engine, e.g. `thinking_token_budget` on vLLM) and per-level token budgets
 - **📈 Metrics** — enable/disable footer metrics, server poll interval
-- **⚙️ Settings** — opens a native settings panel (the same UI as pi's own `/settings`): one row per option with its current value, a help line under the list explaining the highlighted option, Enter/Space to change, fuzzy search, Esc to go back. Covers discovery timeout, poll interval/budget, startup grace, fail limit, vision detection, prefix model IDs, name badges, unloaded router models, max output tokens, request timeout, header warmup
+- **⚙️ Settings** — opens a native settings panel (the same UI as pi's own `/settings`): one row per option with its current value, a help line under the list explaining the highlighted option, Enter/Space to change, fuzzy search, Esc to go back. Covers discovery timeout, poll interval/budget, background rescan, startup grace, fail limit, vision detection, prefix model IDs, name badges, unloaded router models, max output tokens, request timeout, header warmup
 - **♻️ Reset settings** — restore all discovery settings to their defaults
 - **ℹ️ About** — extension info
+
+### `/llama-infra use <model>`
+
+Selects a discovered model for the running session (pi's own selection path, so the footer, `/model` and the session log all agree), instead of making you open `/model` after every swap:
+
+```
+/llama-infra use uncensored      # fragment of id, name or raw server id
+/llama-infra use Example-27B (gpu-host:8080)
+```
+
+Matching is separator- and case-insensitive across the registered id, the display name and the raw served id, and it rescans first when nothing matches. An unloaded router model loses to an equally matching loaded one. Nothing is guessed: an ambiguous fragment lists the candidates and asks, and an unknown one lists the closest ids.
+
+**Swapping models without restarting pi.** A model that disappears from a server while the session is using it is detected on the next discovery (background rescan, `/llama-infra scan`, or session start). If exactly one model replaced it on that endpoint, llama-infra switches the session onto it and announces it; with several, it tells you to run `/llama-infra use`. A request can never go out with a stale id that this extension issued and cannot map: it reports `"<id>" is not served on <host:port>` and points at the command instead of letting the server reject it.
+
+Model flavor words (`Uncensored`, `Instruct`, `Alpaca`, `Base`, `MoE`, …) are kept in registered names — only quantization, file and version suffixes are stripped — so a fine-tune never registers under the name of the model it was tuned from.
 
 ### `/llama-infra list`
 
@@ -424,6 +440,7 @@ Everything is configurable through the UI, but the persisted file is `~/.pi/agen
 | `discoveryTimeoutMs` | `2000` | Per-request timeout when probing endpoints |
 | `pollIntervalMs` | `4000` | Background re-poll rate while servers load models |
 | `pollMaxMs` | `90000` | Max total polling time |
+| `rescanIntervalMs` | `30000` | Background re-scan of every enabled endpoint, so a model swapped on a running server is picked up without a manual scan; `0` turns it off |
 | `startupGraceMs` | `40000` | Keep trying at startup while nothing has answered |
 | `knownGoodFailLimit` | `3` | Consecutive failures before a live endpoint is dropped |
 | `detectVision` | `true` | Scan `/proc` for `--mmproj` + read server-reported modalities |

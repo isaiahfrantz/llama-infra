@@ -239,7 +239,13 @@ export function cleanModelName(rawId: string): string {
 		/[-_.][Qq]5_[0K]_[MS]$/i,
 		/[-_.][Qq]6_[Kk](_[A-Z])?$/i,
 		/[-_.][Qq]8_[0O]$/i,
-		/-(?:Uncensored|Alpaca|Instruct|Chat|Turbo|Base|MoE|UD)(?:-[a-zA-Z0-9]+)*$/i,
+		// Packaging token without a file extension (…-Orca-v5.0-GGUF).
+		/[-_.](?:gguf|ggml)$/i,
+		// Flavor words (Uncensored, Instruct, Alpaca, Base, MoE, …) are NOT stripped:
+		// they are the only difference between a fine-tune and the model it came
+		// from, so stripping them made a swapped model register under the previous
+		// model's name (…-Flash-Next-Uncensored → "…-Flash-Next") and the two
+		// endpoints became indistinguishable in /model and in modelOptions keys.
 		/-(?:v[0-9.]+)(?:-[a-zA-Z0-9]+)*$/i,
 		/-+$/,
 	];

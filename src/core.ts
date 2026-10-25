@@ -36,6 +36,7 @@ export const DEFAULT_SETTINGS: SettingsConfig = {
 	pollIntervalMs: 4000,
 	pollMaxMs: 90_000,
 	startupGraceMs: 40_000,
+	rescanIntervalMs: 30_000,
 	maxOutputTokens: DEFAULT_MAX_OUTPUT_TOKENS,
 	requestTimeoutMs: DEFAULT_PROVIDER_TIMEOUT_MS,
 	knownGoodFailLimit: 3,
